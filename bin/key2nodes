@@ -8,6 +8,7 @@ use Net::OpenSSH;
 use Term::ReadKey;
 use SSH::Batch::ForNodes;
 use File::Temp qw/ :POSIX /;
+use File::HomeDir;
 
 sub help ($);
 
@@ -17,20 +18,13 @@ if (!@ARGV) {
 }
 
 my $list_hosts_only = 0;
-my ($user, $port, $timeout, $verbose, $ask_for_pass, $recursive, $use_glob);
-my (@files, @exprs);
+my ($user, $port, $timeout, $verbose);
+my (@exprs);
 my $fetch_value;
-my $found_sep;
 for (@ARGV) {
     if (defined $fetch_value) {
         $fetch_value->($_);
         undef $fetch_value;
-        next;
-    }
-    if ($_ eq '--') {
-        @files = @exprs;
-        @exprs = ();
-        $found_sep = 1;
         next;
     }
     if (/^-([A-Za-z])(.*)/) {
@@ -50,12 +44,6 @@ for (@ARGV) {
             $fetch_value = sub { $port = shift };
         } elsif ($group eq 'v') {
             $verbose = 1;
-        } elsif ($group eq 'w') {
-            $ask_for_pass = 1;
-        } elsif ($group eq 'r') {
-            $recursive = 1;
-        } elsif ($group eq 'g') {
-            $use_glob = 1;
         } else {
             die "Unknown option: $_\n";
         }
@@ -64,43 +52,39 @@ for (@ARGV) {
     push @exprs, $_;
 }
 
-if (!$found_sep && !@files) {
-    push @files, shift @exprs;
-}
-if (!@files) {
-    die "No local files/directories specified.\n";
-}
-
-if ($use_glob) {
-    @files = map glob, @files;
-}
-for my $file (@files) {
-    if (!-e $file) {
-        die "Local file/directory $file not found.\n";
-    }
-}
-
-if ($verbose) {
-    warn "Local files: ", (map { "[$_]" } @files), "\n";
-}
-
-my $expr = join ' ', @exprs;
-my $target_path;
-if ($expr =~ s/\s*:(\D\S*)\s*$//) {
-    $target_path = $1;
-} else {
-    die "No remote target path specified.\n",
-        "  (You forgot to specify \":/path/to/target\" at the end of the command line?)\n";
-}
-
-if ($expr =~ /^\s*$/) {
+if (!@exprs) {
     die "No cluster expression specified.\n";
 }
+my $expr = join ' ', @exprs;
 
 if ($verbose) {
     warn "Cluster expression: $expr\n";
-    warn "Target path: ", defined $target_path ? $target_path : '', "\n";
 }
+
+my $home = File::HomeDir->my_home;
+if (!defined $home) {
+    die "Can't find the home for the current user.\n";
+}
+
+my $pubkey_file = "$home/.ssh/id_rsa.pub";
+if (-f $pubkey_file) {
+    if ($verbose) {
+        warn "Found public key file $pubkey_file.\n";
+    }
+} else {
+    my $cmd = "(echo; echo y; echo; echo) | ssh-keygen -q -t rsa";
+    if ($verbose) {
+        warn "Running command [$cmd]...\n";
+    }
+    if (system($cmd) != 0) {
+        die "Generating SSH key failed.\n";
+    }
+}
+
+open my $in, $pubkey_file or
+    die "Can't open $pubkey_file for reading: $!\n";
+my $pubkey = do { local $/; <$in> };
+close $in;
 
 my ($rc, $rcfile) = SSH::Batch::ForNodes::init();
 SSH::Batch::ForNodes::load_rc($rc, $rcfile);
@@ -122,16 +106,14 @@ if ($list_hosts_only) {
 }
 
 my $password;
-if ($ask_for_pass) {
-    print STDERR "Password:";
-    ReadMode(2);
-    while (not defined ($password = ReadLine(0))) {
-    }
-    ReadMode(0);
-    chomp $password;
-    if (!$password) {
-        die "No password specified.\n";
-    }
+print STDERR "Password:";
+ReadMode(2);
+while (not defined ($password = ReadLine(0))) {
+}
+ReadMode(0);
+chomp $password;
+if (!$password) {
+    die "No password specified.\n";
 }
 
 my %conns;
@@ -142,22 +124,24 @@ for my $host (@hosts) {
         defined $timeout ? (timeout => $timeout) : (),
         defined $user ? (user => $user) : (),
         defined $port ? (port => $port) : (),
-        defined $password ? (password => $password) : (),
+        password => $password,
     );
 }
+
 my (@pids, @outs);
 for my $host (@hosts) {
     my ($out, $outfile) = tmpnam();
     push @outs, $outfile;
-    push @pids, $conns{$host}->scp_put({
+    push @pids, $conns{$host}->system({
+        stdin_data => $pubkey,
         stdout_fh => $out,
         stderr_to_stdout => 1,
         async => 1,
-        defined $recursive ? (recursive => $recursive) : (),
-        # XXX recursive
-    }, @files, $target_path);
+        tty => 1,
+    }, 'if [ ! -d ~/.ssh ]; then mkdir ~/.ssh; fi; chmod 700 ~/.ssh; cat >> ~/.ssh/authorized_keys && chmod 640 ~/.ssh/authorized_keys');
 }
 
+## HERE...
 my $i = 0;
 for my $pid (@pids) {
     my $host = $hosts[$i++];
@@ -166,18 +150,16 @@ for my $pid (@pids) {
         warn "Failed to connect to host $host.\n";
         next;
     }
+    my $exit = 0;
     if (waitpid($pid, 0) > 0) {
-        my $exit = ($? >> 8);
-        if ($exit) {
-            warn "$host: Transfer of files failed (status code: $exit)\n";
-            next;
-        }
+        $exit = ($? >> 8);
     } else {
         #redo if ($! == EINTR);
         warn "$host: waitpid($pid) failed: $!\n";
         next;
     }
     my $outfile = shift @outs;
+
     my $in;
     if (!open $in, $outfile) {
         warn "Can't open $outfile for reading: $!\n";
@@ -185,6 +167,9 @@ for my $pid (@pids) {
     }
     while (<$in>) {
         print;
+    }
+    if ($exit > 0) {
+        warn "Remote command returns status code $exit.\n";
     }
     print "\n";
     close $in;
@@ -195,19 +180,15 @@ sub help ($) {
     my $msg = <<'_EOC_';
 USAGE:
 
-    tonodes [OPTIONS] FILE... -- HOST_PATTERN... [OPTIONS]
-    tonodes [OPTIONS] FILE HOST_PATTERN... [OPTIONS]
+    key2nodes [OPTIONS] HOST_PATTERN... [OPTIONS]
 
 OPTIONS:
-    -g            Use glob to process the input files/directories.
     -h            Print this help.
     -l            List the hosts and do nothing else.
     -p <port>     Port for the remote SSH service.
-    -r            Recurse into directories too.
     -t <timeout>  Specify timeout for net traffic.
     -u <user>     User account for SSH login.
     -v            Be verbose.
-    -w            Prompt for password (used mostly for login and sudo).
 _EOC_
     if ($exit_code == 0) {
         print $msg;
@@ -221,36 +202,39 @@ __END__
 
 =head1 NAME
 
-tonodes - Upload local files/directories to remote clusters
+key2nodes - Push SSH public keys to remote clusters
 
 =head1 SYNOPSIS
 
-    # tonodes calls fornodes internally...
-
-    $ tonodes /tmp/*.inst -- '{as}:/tmp/'
-    $ tonodes foo.txt 'ws1105*' :/tmp/bar.txt
-    $ tonodes -r /opt /bin/* -- 'ws[1101-1102].foo.com' 'bar.com' :/foo/bar/
+    # run a command on the specified servers:
+    $ key2nodes 'ws[1101-1105].as.com'
 
 =head1 USAGE
 
-    tonodes [OPTIONS] FILE... -- HOST_PATTERN... [OPTIONS]
-    tonodes [OPTIONS] FILE HOST_PATTERN... [OPTIONS]
+    key2nodes [OPTIONS] HOST_PATTERN... [OPTIONS]
 
 =head1 OPTIONS
 
-    -g            Use glob to process the input files/directories.
     -h            Print this help.
     -l            List the hosts and do nothing else.
     -p <port>     Port for the remote SSH service.
-    -r            Recurse into directories too.
     -t <timeout>  Specify timeout for net traffic.
     -u <user>     User account for SSH login.
     -v            Be verbose.
-    -w            Prompt for password (used mostly for login and sudo).
+
+=head1 DESCRIPTION
+
+This script push local ~/.ssh/id_rsa.pub file (i.e. the SSH public key) onto the remote server's ~/.ssh/authorized_keys. It will chmod .ssh to 700 and .ssh/authorized_keys to 640.
+
+If there's no .ssh directory on the remote server, it will try to create one.
+
+Note that the sh/bash shell is assumed on the remote machines.
+
+When no ~/.ssh/id_rsa.pub file found on the local machine, it will invoke "ssh-keygen -t rsa" automatically.
 
 =head1 SEE ALSO
 
-L<fornodes>, L<atnodes>, L<SSH::Batch>, L<Net::OpenSSH>.
+L<fornodes>, L<atnodes>, L<tonodes>, L<SSH::Batch>, L<Net::OpenSSH>.
 
 =head1 COPYRIGHT AND LICENSE
 
