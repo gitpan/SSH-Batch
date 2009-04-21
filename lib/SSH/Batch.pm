@@ -3,7 +3,7 @@ package SSH::Batch;
 use strict;
 use warnings;
 
-our $VERSION = '0.001';
+our $VERSION = '0.002';
 
 1;
 __END__
@@ -23,7 +23,7 @@ The following scripts are provided:
 Expand patterns to machine host list.
 
     $ cat > ~/.fornodesrc
-    ps=blah.ps.com bloo.ps.com boo[2-25,26-70].ps.com
+    ps=blah.ps.com bloo.ps.com boo[2-25,32,41-70].ps.com
     as=ws[1101-1105].as.com
     ^D
     $ fornodes 'api[02-10].foo.bar.com' 'boo*.ps.com'
@@ -56,14 +56,21 @@ Run command on clusters. (atnodes calls fornodes internally.)
     # or specify a timeout:
     $ atnodes 'ping foo.com' '{ps}' -t 3
 
-=item tonodes (TODO)
+=item tonodes
 
-Transfer local files or directories to clusters.
+Upload local files/directories to remote clusters
 
     $ tonodes /tmp/*.inst -- '{as}:/tmp/'
-    $ tonodes /tmp/*.inst -- 'ws1105*:/tmp/'
+    $ tonodes foo.txt 'ws1105*' :/tmp/bar.txt
+    $ tonodes -r /opt /bin/* -- 'ws[1101-1102].foo.com' 'bar.com' :/foo/bar/
 
 =back
+
+=head1 DESCRIPTION
+
+This is a high-level abstraction over the powerful L<Net::OpenSSH> module. A bunch of handy scripts are provided to simplify big cluster operations: L<fornodes>, L<atnodes>, and L<tonodes>.
+
+Parallel SSH communication is used to ensure minimal latency.
 
 =head1 INSTALLATION
 
@@ -83,12 +90,17 @@ public Git repository:
 
 If you have a branch for me to pull, please let me know ;)
 
+=head1 SEE ALSO
+
+L<fornodes>, L<atnodes>, L<tonodes>, L<SSH::Batch::ForNodes>, L<Net::OpenSSH>.
+
 =head1 COPYRIGHT AND LICENSE
 
 This module as well as its programs are licensed under the BSD License.
 
 Copyright (c) 2009, Yahoo! China EEEE Works, Alibaba Inc. All rights reserved.
-Copyright (C) 2009, Agent Zhang (agentzh).
+
+Copyright (C) 2009, Agent Zhang (agentzh). All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 
