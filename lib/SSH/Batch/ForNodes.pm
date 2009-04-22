@@ -3,7 +3,7 @@ package SSH::Batch::ForNodes;
 use strict;
 use warnings;
 
-our $VERSION = '0.005';
+our $VERSION = '0.006';
 
 use Set::Scalar;
 use File::HomeDir;
@@ -44,13 +44,14 @@ sub load_rc ($$) {
         s/\#.*//;
         next if /^\s*$/;
         chomp;
-        if (s/\\\s*$//) {
-            $accum_ln .= $_;
+        if (s/\\\s*$//s) {
+            $accum_ln .= " $_";
             next;
         }
         if (defined $accum_ln) {
-            parse_line($accum_ln, $rcfile);
+            parse_line("$accum_ln $_", $rcfile);
             undef $accum_ln;
+            next;
         }
         parse_line($_, $rcfile);
     }
@@ -260,7 +261,7 @@ __END__
 
 =head1 NAME
 
-SSH::Batch::ForNodes - expands set arithmetic expression to host list
+SSH::Batch::ForNodes - Expands set arithmetic expression to host list.
 
 =head1 SYNOPSIS
 

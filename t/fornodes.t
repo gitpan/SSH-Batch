@@ -441,3 +441,49 @@ d
 --- err
 --- status: 0
 
+
+
+=== TEST 40: single-line comments in rc
+--- expr: {A} + {B}
+--- rc
+#howdy
+A=a c
+  # blah...
+B=b
+--- out
+a
+b
+c
+--- err
+--- status: 0
+
+
+
+=== TEST 41: multi-line expressions (two lines)
+--- expr: {A}
+--- rc
+ A = a b \
+    c
+--- out
+a
+b
+c
+--- err
+--- status: 0
+
+
+
+=== TEST 42: multi-line expressions (three lines)
+--- expr: {A}
+--- rc
+ A = a b \
+    c\
+d
+--- out
+a
+b
+c
+d
+--- err
+--- status: 0
+

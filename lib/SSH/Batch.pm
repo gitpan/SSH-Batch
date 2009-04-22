@@ -3,7 +3,7 @@ package SSH::Batch;
 use strict;
 use warnings;
 
-our $VERSION = '0.005';
+our $VERSION = '0.006';
 
 1;
 __END__
@@ -27,6 +27,9 @@ Expand patterns to machine host list.
     as=ws[1101-1105].as.com
     # use set operations to define new sets:
     foo={ps} + {ps} * {as} - {ps} / {as}
+     bar = foo.com bar.org \
+        bah.cn \
+        baz.com
     ^D
 
     $ fornodes 'api[02-10].foo.bar.com' 'boo*.ps.com'
