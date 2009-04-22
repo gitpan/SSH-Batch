@@ -1,3 +1,8 @@
+0.007
+- added -c <concurrency> option to atnodes/tonodes/key2nodes and it has the
+  default SSH concurrency limit of 20.
+- skip directories in tonode if no -r specified.
+
 0.006
 - fixed a bug in multiline expression handling in ~/.fornodesrc parsing.
 - added multi-line expression samples to the POD docs.
