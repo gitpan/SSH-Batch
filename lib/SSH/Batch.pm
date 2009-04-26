@@ -3,7 +3,7 @@ package SSH::Batch;
 use strict;
 use warnings;
 
-our $VERSION = '0.016';
+our $VERSION = '0.017';
 
 1;
 __END__
@@ -323,7 +323,7 @@ clusters to local file system (maybe grouped by host name).
 
 =item *
 
-Add the L<betweennodes> script to transfer files between clusters through
+Add the C<betweennodes> script to transfer files between clusters through
 localhost.
 
 =back
