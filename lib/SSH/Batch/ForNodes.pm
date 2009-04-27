@@ -3,7 +3,7 @@ package SSH::Batch::ForNodes;
 use strict;
 use warnings;
 
-our $VERSION = '0.017';
+our $VERSION = '0.018';
 
 use Set::Scalar;
 use File::HomeDir;
@@ -261,7 +261,7 @@ __END__
 
 =head1 NAME
 
-SSH::Batch::ForNodes - Expands set arithmetic expression to host list.
+SSH::Batch::ForNodes - Expand set arithmetic expression to host list
 
 =head1 SYNOPSIS
 
