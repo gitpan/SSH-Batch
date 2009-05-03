@@ -3,7 +3,7 @@ package SSH::Batch::ForNodes;
 use strict;
 use warnings;
 
-our $VERSION = '0.020';
+our $VERSION = '0.021';
 
 use Set::Scalar;
 use File::HomeDir;
@@ -27,8 +27,8 @@ sub clear_universe () {
 }
 
 sub init () {
-    my $home = File::HomeDir->my_home;
-    if (!defined $home) {
+    my $home = $ENV{SSH_BATCH_HOME} || File::HomeDir->my_home;
+    if (!defined $home || !-d $home) {
         die "Can't find the home for the current user.\n";
     }
     my $rcfile = "$home/.fornodesrc";
