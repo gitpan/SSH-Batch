@@ -102,23 +102,25 @@ blah=foo
 --- err
 Using Scp method.
 Local files: [t/tonodes.t]
+WARNING: Expanding target path ~ to /home/sshbatch
 Cluster expression: foo.com *foo
-Target path: ~
+Target path: /home/sshbatch
 Cluster set: foo foo.com
 --- status: 0
 
 
 
 === TEST 8: no dash-dash
---- args: t/tonodes.t foo.com '*foo' :~ -l -v
+--- args: t/tonodes.t foo.com '*foo' :~/ -l -v
 --- rc
 blah=foo
 --- out
 --- err
 Using Scp method.
 Local files: [t/tonodes.t]
+WARNING: Expanding target path ~/ to /home/sshbatch/
 Cluster expression: foo.com *foo
-Target path: ~
+Target path: /home/sshbatch/
 Cluster set: foo foo.com
 --- status: 0
 
@@ -193,4 +195,46 @@ Warning: Skipped directory t.
 ERROR: No files to be transferred.
 --- out
 --- status: 1
+
+
+
+=== TEST 14: ~foo shortcut
+--- args: t/tonodes.t foo.com:~foo -l -v
+--- err
+Using Scp method.
+Local files: [t/tonodes.t]
+WARNING: Expanding target path ~foo to /home/foo
+Cluster expression: foo.com
+Target path: /home/foo
+Cluster set: foo.com
+--- out
+--- status: 0
+
+
+
+=== TEST 15: ~foo/abc shortcut
+--- args: t/tonodes.t foo.com:~foo/abc -l -v
+--- err
+Using Scp method.
+Local files: [t/tonodes.t]
+WARNING: Expanding target path ~foo/abc to /home/foo/abc
+Cluster expression: foo.com
+Target path: /home/foo/abc
+Cluster set: foo.com
+--- out
+--- status: 0
+
+
+
+=== TEST 16: only leading ~ will be transformed
+--- args: t/tonodes.t foo.com:~foo/baz~bar -l -v
+--- err
+Using Scp method.
+Local files: [t/tonodes.t]
+WARNING: Expanding target path ~foo/baz~bar to /home/foo/baz~bar
+Cluster expression: foo.com
+Target path: /home/foo/baz~bar
+Cluster set: foo.com
+--- out
+--- status: 0
 
