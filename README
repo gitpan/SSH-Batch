@@ -3,7 +3,7 @@ NAME
     arithmetic
 
 VERSION
-    This document describes SSH::Batch 0.023 released on Jan 4, 2010.
+    This document describes SSH::Batch 0.024 released on Nov 1, 2010.
 
 SYNOPSIS
     The following scripts are provided:

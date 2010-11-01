@@ -3,13 +3,13 @@ package SSH::Batch::ForNodes;
 use strict;
 use warnings;
 
-our $VERSION = '0.023';
+our $VERSION = '0.024';
 
 use Set::Scalar;
 use File::HomeDir;
 
 sub clear_universe ();
-sub init ();
+sub init_rc ();
 sub load_rc ($$);
 sub parse_line ($$);
 sub parse_expr ($);
@@ -26,15 +26,25 @@ sub clear_universe () {
     $HostUniverse->empty;
 }
 
-sub init () {
+sub init_rc () {
     my $home = $ENV{SSH_BATCH_HOME} || File::HomeDir->my_home;
     if (!defined $home || !-d $home) {
         die "Can't find the home for the current user.\n";
     }
     my $rcfile = "$home/.fornodesrc";
+
+    # auto create $rcfile if $rcfile not exists
+    if (! -e $rcfile) {
+        open my $rc, '>', $rcfile or
+            die "Can't auto create $rcfile: $!\n";
+        close $rc;
+    }
+
     open my $rc, $rcfile or
         die "Can't open $rcfile for reading: $!\n";
-    return ($rc, $rcfile);
+    load_rc($rc, $rcfile);
+    close $rc;
+    #return ($rc, $rcfile);
 }
 
 sub load_rc ($$) {
@@ -55,7 +65,6 @@ sub load_rc ($$) {
         }
         parse_line($_, $rcfile);
     }
-    close $rc;
 }
 
 sub parse_line ($$) {
@@ -87,6 +96,10 @@ sub parse_line ($$) {
 
 sub parse_expr ($) {
     local *_ = \($_[0]);
+
+    # trim
+    s/(?:^\s+|\s+$)//gs;
+
     my @toplevel;
     while (1) {
         if (/\G \s* (?<= [\}\)\s] ) ([-+*\/]) (?= [\{\(\s] ) \s*/gcx) {
@@ -268,8 +281,7 @@ SSH::Batch::ForNodes - Expand set arithmetic expression to host list
     # below is essential what in the "fornodes" script:
     use SSH::Batch::ForNodes;
 
-    my ($rc, $rcfile) = SSH::Batch::ForNodes::init();
-    SSH::Batch::ForNodes::load_rc($rc, $rcfile);
+    SSH::Batch::ForNodes::init_rc();
     my $set = SSH::Batch::ForNodes::parse_expr($expr);
     # set is a Set::Scalar instance:
     for my $host (sort $set->elements) {
